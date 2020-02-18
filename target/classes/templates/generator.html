@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.1.4/sockjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+<script>
+    function onConnected() {
+        stompClient.subscribe('/app/generator.settings', function (settings) {
+            var settings = JSON.parse(settings.body);
+            document.getElementById("auto").checked = (settings['isAuto'] == 'true');
+            document.getElementById("length").value = settings['massLength'];
+        });
+
+        stompClient.subscribe('/topic/auto', isAutoUpdate);
+        stompClient.subscribe('/topic/length', generatorLengthUpdate);
+        stompClient.subscribe('/topic/sequence', getNewSequence);
+        stompClient.subscribe('/topic/mass', getNewMass);
+        console.log("Connect Success");
+    }
+
+    function onError(error) {
+        console.log("Error");
+    }
+
+    var stompClient = null;
+
+    var socket = new SockJS('/ws');
+    stompClient = Stomp.over(socket);
+
+    stompClient.connect({}, onConnected, onError);
+
+    function generateMass() {
+        stompClient.send("/app/generator.mass");
+    }
+
+    function generateSequence()
+    {
+        stompClient.send("/app/generator.sequence");
+    }
+
+    function isAutoUpdate(update)
+    {
+        document.getElementById("auto").checked = (update.body == 'true');
+    }
+
+    function generatorLengthUpdate(update)
+    {
+        document.getElementById("length").value = update.body;
+    }
+
+    function lengthChanged()
+    {
+        stompClient.send("/app/generator.masslength", {}, JSON.stringify(document.getElementById("length").value));
+    }
+
+    function autoChecked()
+    {
+        stompClient.send("/app/generator.auto", {}, JSON.stringify(document.getElementById("auto").checked));
+    }
+
+    function getNewSequence(update)
+    {
+        var numbers = JSON.parse(update.body);
+        document.getElementById('sequences').insertRow().insertCell().innerHTML = numbers.reduce((accum, value) => value + ', ' + accum);
+    }
+
+    function getNewMass(update)
+    {
+        var numbers = JSON.parse(update.body);
+        var table = document.getElementById('mass');
+        var tableRows = table.getElementsByTagName('tr');
+        if (tableRows.length > 1)
+            table.deleteRow(1);
+        table.insertRow().insertCell().innerHTML = numbers.reduce((accum, value) => value + ', ' + accum);
+    }
+
+</script>
+<style>
+    table, th, td {
+        border: 1px solid black;
+    }
+</style>
+<head>
+    <meta charset="UTF-8">
+    <title>Number Sequences Generator</title>
+</head>
+<body>
+    <h2>Number Sequences Generator</h2>
+    <div>
+        <div>Mass Length:</div>
+        <div><input path="length" type='text' id='length' onchange="lengthChanged()"/></div>
+    </div>
+    <div>
+        <div><input path="generate" type='button' id='generate' value="Generate Mass" onclick="generateMass()"/></div>
+    </div>
+    <div>
+        <div>
+            <table id="mass" >
+                <tr>
+                    <td>Mass</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <div>
+        <div><input path="generate" type='button' id='generate' value="Generate Sequence" onclick="generateSequence()"/></div>
+    </div>
+    <div>
+        <div>Auto<input path="auto" type="checkbox" id="auto" onchange="autoChecked()"></div>
+    </div>
+    <div>
+        <table id="sequences" >
+            <tr>
+                <td>Sequences</td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>
